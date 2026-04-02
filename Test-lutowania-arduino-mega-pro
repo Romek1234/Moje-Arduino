@@ -1,0 +1,151 @@
+struct PinPair {
+  uint8_t pinA;
+  uint8_t pinB;
+};
+
+PinPair pairs[] = {
+  {2, A0},{3, A1},{4, A2},{5, A3},
+  {6, A4},{7, A5},{8, A6},{9, A7},
+  {10, A8},{11, A9},{12, A10},{13, A11},
+  {14, A12},{15, A13},{16, A14},{17, A15},
+  {18, 32},{19, 33},{20, 34},{21, 35},
+  {22, 36},{23, 37},{24, 38},{25, 39},
+  {26, 40},{27, 41},{28, 42},{29, 43},
+  {30, 44},{31, 45}
+};
+
+const int pairCount = sizeof(pairs) / sizeof(pairs[0]);
+
+bool globalError = false;
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("=== TEST POLACZEN IDC ===");
+}
+
+void loop() {
+
+  globalError = false;
+
+  for (int i = 0; i < pairCount; i++) {
+    if (!testPair(pairs[i].pinA, pairs[i].pinB)) {
+      globalError = true;
+    }
+  }
+
+  Serial.println("\n=== PODSUMOWANIE ===");
+  if (globalError) Serial.println("TEST FAILED");
+  else Serial.println("TEST PASSED");
+  Serial.println("====================\n");
+
+  delay(4000);
+}
+
+
+// ===== TEST PAR =====
+bool testPair(uint8_t pin1, uint8_t pin2) {
+
+  bool error = false;
+
+  Serial.print("Test: D");
+  Serial.print(pin1);
+  Serial.print(" <-> ");
+  if (pin2 >= A0) {
+    Serial.print("A");
+    Serial.print(pin2 - A0);
+  } else {
+    Serial.print("D");
+    Serial.print(pin2);
+  }
+  Serial.print(" ... ");
+
+  // ===== RESET =====
+  for (int i = 0; i < pairCount; i++) {
+    pinMode(pairs[i].pinA, OUTPUT);
+    digitalWrite(pairs[i].pinA, HIGH);
+
+    pinMode(pairs[i].pinB, OUTPUT);
+    digitalWrite(pairs[i].pinB, HIGH);
+  }
+
+  // ===== TEST CIĄGŁOŚCI =====
+  pinMode(pin1, OUTPUT);
+  pinMode(pin2, INPUT_PULLUP);
+
+  digitalWrite(pin1, LOW);
+  delay(2);
+  if (digitalRead(pin2) != LOW) {
+    Serial.print("\n  brak LOW (->)");
+    error = true;
+  }
+
+  digitalWrite(pin1, HIGH);
+  delay(2);
+  if (digitalRead(pin2) != HIGH) {
+    Serial.print("\n  brak HIGH (->)");
+    error = true;
+  }
+
+  // ===== TEST W DRUGĄ STRONĘ =====
+  pinMode(pin2, OUTPUT);
+  pinMode(pin1, INPUT_PULLUP);
+
+  digitalWrite(pin2, LOW);
+  delay(2);
+  if (digitalRead(pin1) != LOW) {
+    Serial.print("\n  brak LOW (<-)");
+    error = true;
+  }
+
+  digitalWrite(pin2, HIGH);
+  delay(2);
+  if (digitalRead(pin1) != HIGH) {
+    Serial.print("\n  brak HIGH (<-)");
+    error = true;
+  }
+
+  // ===== TEST ZWARCIA =====
+  // wszystkie inne piny są HIGH → stabilny stan
+
+  // ustaw testowany pin na LOW
+  pinMode(pin1, OUTPUT);
+  digitalWrite(pin1, LOW);
+
+  delay(2);
+
+  for (int i = 0; i < pairCount; i++) {
+
+    uint8_t a = pairs[i].pinA;
+    uint8_t b = pairs[i].pinB;
+
+    if (a != pin1 && a != pin2) {
+      if (digitalRead(a) == LOW) {
+        Serial.print("\n  ZWARCIE do D");
+        Serial.print(a);
+        error = true;
+      }
+    }
+
+    if (b != pin1 && b != pin2) {
+      if (digitalRead(b) == LOW) {
+        Serial.print("\n  ZWARCIE do ");
+        if (b >= A0) {
+          Serial.print("A");
+          Serial.print(b - A0);
+        } else {
+          Serial.print("D");
+          Serial.print(b);
+        }
+        error = true;
+      }
+    }
+  }
+
+  if (!error) {
+    Serial.println("OK");
+  } else {
+    Serial.println("\n  -> BLAD");
+  }
+
+  return !error;
+}
